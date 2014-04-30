@@ -311,29 +311,39 @@ func (d *DNSServer) nodeLookup(network, datacenter, node string, req, resp *dns.
 		return
 	}
 
-	// Make an RPC request
-	args := structs.NodeSpecificRequest{
-		Datacenter: datacenter,
-		Node:       node,
-	}
-	var out structs.IndexedNodeServices
-	if err := d.agent.RPC("Catalog.NodeServices", &args, &out); err != nil {
-		d.logger.Printf("[ERR] dns: rpc error: %v", err)
+	nodeServices, _, err := d.getNodeRecords(datacenter, node)
+	if err != nil {
 		resp.SetRcode(req, dns.RcodeServerFailure)
 		return
 	}
 
 	// If we have no address, return not found!
-	if out.NodeServices == nil {
+	if nodeServices == nil {
 		resp.SetRcode(req, dns.RcodeNameError)
 		return
 	}
 
 	// Add the node record
-	records := d.formatNodeRecord(&out.NodeServices.Node, req.Question[0].Name, qType)
+	records := d.formatNodeRecord(&nodeServices.Node, req.Question[0].Name, qType)
 	if records != nil {
 		resp.Answer = append(resp.Answer, records...)
 	}
+}
+
+// getNodeRecords gets the records for a nodeLookup either from the cache
+// or by making an RPC call
+func (d *DNSServer) getNodeRecords(dc, node string) (*structs.NodeServices, time.Duration, error) {
+	// Make an RPC request
+	args := structs.NodeSpecificRequest{
+		Datacenter: dc,
+		Node:       node,
+	}
+	var out structs.IndexedNodeServices
+	if err := d.agent.RPC("Catalog.NodeServices", &args, &out); err != nil {
+		d.logger.Printf("[ERR] dns: rpc error: %v", err)
+		return nil, 0, err
+	}
+	return out.NodeServices, 0, nil
 }
 
 // formatNodeRecord takes a Node and returns an A, AAAA, or CNAME record
