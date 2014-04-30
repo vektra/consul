@@ -16,8 +16,15 @@ import (
 	"time"
 )
 
-// gracefulTimeout controls how long we wait before forcefully terminating
-var gracefulTimeout = 5 * time.Second
+const (
+	// gracefulTimeout controls how long we wait before forcefully terminating
+	gracefulTimeout = 5 * time.Second
+
+	// minTTLWarn controls how low a DNS TTL can be before we warn about it.
+	// This is for non-zero TTLs, and is to prevent a missing suffix from causing
+	// a 5 nanosecond cache value.
+	minTTLWarn = 50 * time.Millisecond
+)
 
 // Command is a Command implementation that runs a Consul agent.
 // The command will not end unless a shutdown message is sent on the
@@ -195,7 +202,31 @@ func (c *Command) setupAgent(config *Config, logOutput io.Writer, logWriter *log
 			return err
 		}
 
-		server, err := NewDNSServer(agent, logOutput, config.Domain,
+		// Get cache configuration
+		nodeTTL, err := config.DNSNodeTTL()
+		if err != nil {
+			c.Ui.Error(fmt.Sprintf("Invalid DNS Node TTL: %s", err))
+			return err
+		}
+		if nodeTTL != 0 && nodeTTL < minTTLWarn {
+			c.Ui.Error(fmt.Sprintf("WARNING: DNS Node TTL set below %v: %v", minTTLWarn, nodeTTL))
+		}
+		serviceTTL, err := config.DNSServiceTTL()
+		if err != nil {
+			c.Ui.Error(fmt.Sprintf("Invalid DNS Service TTL: %s", err))
+			return err
+		}
+		for key, ttl := range serviceTTL {
+			if ttl != 0 && ttl < minTTLWarn {
+				c.Ui.Error(fmt.Sprintf("WARNING: DNS Service TTL for '%s' set below %v: %v", key, minTTLWarn, ttl))
+			}
+		}
+
+		// Create a cache
+		cache := NewDNSCache(nodeTTL, serviceTTL, 0)
+
+		// Create the DNS server
+		server, err := NewDNSServer(agent, cache, logOutput, config.Domain,
 			dnsAddr.String(), config.DNSRecursor)
 		if err != nil {
 			agent.Shutdown()

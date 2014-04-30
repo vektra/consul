@@ -23,6 +23,7 @@ const (
 // service discovery endpoints using a DNS interface.
 type DNSServer struct {
 	agent        *Agent
+	cache        *DNSCache
 	dnsHandler   *dns.ServeMux
 	dnsServer    *dns.Server
 	dnsServerTCP *dns.Server
@@ -32,7 +33,7 @@ type DNSServer struct {
 }
 
 // NewDNSServer starts a new DNS server to provide an agent interface
-func NewDNSServer(agent *Agent, logOutput io.Writer, domain, bind, recursor string) (*DNSServer, error) {
+func NewDNSServer(agent *Agent, cache *DNSCache, logOutput io.Writer, domain, bind, recursor string) (*DNSServer, error) {
 	// Make sure domain is FQDN
 	domain = dns.Fqdn(domain)
 
@@ -52,9 +53,15 @@ func NewDNSServer(agent *Agent, logOutput io.Writer, domain, bind, recursor stri
 		Handler: mux,
 	}
 
+	// Make sure we always have a cache
+	if cache == nil {
+		cache = NewDNSCache(0, nil, 0)
+	}
+
 	// Create the server
 	srv := &DNSServer{
 		agent:        agent,
+		cache:        cache,
 		dnsHandler:   mux,
 		dnsServer:    server,
 		dnsServerTCP: serverTCP,
