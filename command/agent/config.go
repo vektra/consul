@@ -124,6 +124,15 @@ type Config struct {
 	// addresses, then the agent will error and exit.
 	StartJoin []string `mapstructure:"start_join"`
 
+	// DNSNodeTTL is how long we are able to cache node lookups. By
+	// default, no caching is done.
+	DNSNodeTTLRaw string `mapstructure:"dns_node_ttl"`
+
+	// DNSServiceTTL is how long we are able to cache service lookups per
+	// service. The "*" service is a wildcard for all services.
+	// By default, no caching is done.
+	DNSServiceTTLRaw map[string]string `mapstructure:"dns_service_ttl"`
+
 	// AEInterval controls the anti-entropy interval. This is how often
 	// the agent attempts to reconcile it's local state with the server'
 	// representation of our state. Defaults to every 60s.
@@ -177,6 +186,31 @@ func (c *Config) ClientListener(port int) (*net.TCPAddr, error) {
 		return nil, fmt.Errorf("Failed to parse IP: %v", c.ClientAddr)
 	}
 	return &net.TCPAddr{IP: ip, Port: port}, nil
+}
+
+// DNSNodeTTL attempts to parse the raw configuration
+func (c *Config) DNSNodeTTL() (time.Duration, error) {
+	if c.DNSNodeTTLRaw == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(c.DNSNodeTTLRaw)
+}
+
+// DNSServiceTTL attempts to parse the raw configuration
+func (c *Config) DNSServiceTTL() (map[string]time.Duration, error) {
+	if len(c.DNSServiceTTLRaw) == 0 {
+		return nil, nil
+	}
+	output := make(map[string]time.Duration, len(c.DNSServiceTTLRaw))
+	for key, val := range c.DNSServiceTTLRaw {
+		dur, err := time.ParseDuration(val)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid DNS TTL duration for service '%s'",
+				key)
+		}
+		output[key] = dur
+	}
+	return output, nil
 }
 
 // DecodeConfig reads the configuration from the given reader in JSON
@@ -415,6 +449,17 @@ func MergeConfig(a, b *Config) *Config {
 	}
 	if b.Ports.Server != 0 {
 		result.Ports.Server = b.Ports.Server
+	}
+	if b.DNSNodeTTLRaw != "" {
+		result.DNSNodeTTLRaw = b.DNSNodeTTLRaw
+	}
+	if len(b.DNSServiceTTLRaw) != 0 {
+		if result.DNSServiceTTLRaw == nil {
+			result.DNSServiceTTLRaw = make(map[string]string)
+		}
+		for k, v := range b.DNSServiceTTLRaw {
+			result.DNSServiceTTLRaw[k] = v
+		}
 	}
 
 	// Copy the start join addresses

@@ -246,6 +246,47 @@ func TestDecodeConfig(t *testing.T) {
 	if config.StartJoin[1] != "2.2.2.2" {
 		t.Fatalf("bad: %#v", config)
 	}
+
+	// Node ttl
+	input = `{"dns_node_ttl": "5s"}`
+	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if config.DNSNodeTTLRaw != "5s" {
+		t.Fatalf("bad: %#v", config)
+	}
+
+	if ttl, _ := config.DNSNodeTTL(); ttl != 5*time.Second {
+		t.Fatalf("bad: %#v", ttl)
+	}
+
+	// Service ttl
+	input = `{"dns_service_ttl": {"api": "5s", "*": "1s"}}`
+	config, err = DecodeConfig(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if config.DNSServiceTTLRaw["api"] != "5s" {
+		t.Fatalf("bad: %#v", config)
+	}
+
+	if config.DNSServiceTTLRaw["*"] != "1s" {
+		t.Fatalf("bad: %#v", config)
+	}
+
+	ttls, err := config.DNSServiceTTL()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if ttl := ttls["api"]; ttl != 5*time.Second {
+		t.Fatalf("bad: %#v", ttl)
+	}
+	if ttl := ttls["*"]; ttl != time.Second {
+		t.Fatalf("bad: %#v", ttl)
+	}
 }
 
 func TestDecodeConfig_Service(t *testing.T) {
@@ -377,6 +418,10 @@ func TestMergeConfig(t *testing.T) {
 		Checks:         []*CheckDefinition{nil},
 		Services:       []*ServiceDefinition{nil},
 		StartJoin:      []string{"1.1.1.1"},
+		DNSNodeTTLRaw:  "5s",
+		DNSServiceTTLRaw: map[string]string{
+			"api": "5s",
+		},
 	}
 
 	c := MergeConfig(a, b)
