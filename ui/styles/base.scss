@@ -23,6 +23,36 @@
   }
 }
 
+html, body {
+  height: 100%;
+}
+
+.wrapper {
+  min-height: 100%;
+  height: auto !important;
+  height: 100%;
+  margin: 0 auto -70px;
+}
+
+.footer, .push {
+  font-size: 14px;
+  ul {
+    margin-bottom: 0px;
+  }
+  height: 70px;
+}
+
+.img-do-logo {
+  width: 150px;
+  padding-bottom: 5px;
+  opacity: 0.6;
+
+  &:hover {
+    @include transition(opacity .3s ease-in-out);
+    opacity: 1;
+  }
+}
+
 a {
     button:active {
         outline: none;
