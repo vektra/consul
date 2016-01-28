@@ -296,12 +296,21 @@ func DefaultConfig() *Config {
 	// to communicate between DC's
 	conf.SerfWANConfig.MemberlistConfig = memberlist.DefaultWANConfig()
 
+	// Turn LAN Serf to run globally
+	conf.SerfLANConfig.MemberlistConfig = memberlist.DefaultWANConfig()
+
 	// Ensure we don't have port conflicts
 	conf.SerfLANConfig.MemberlistConfig.BindPort = DefaultLANSerfPort
 	conf.SerfWANConfig.MemberlistConfig.BindPort = DefaultWANSerfPort
 
 	// Disable shutdown on removal
 	conf.RaftConfig.ShutdownOnRemove = false
+
+	// Make Raft more WAN friendly
+	conf.RaftConfig.HeartbeatTimeout = 5000 * time.Millisecond
+	conf.RaftConfig.ElectionTimeout = 5000 * time.Millisecond
+	conf.RaftConfig.CommitTimeout = 100 * time.Millisecond
+	conf.RaftConfig.LeaderLeaseTimeout = 2500 * time.Millisecond
 
 	return conf
 }
